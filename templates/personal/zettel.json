@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "profile": "personal",
+  "owner": {
+    "github": "SHSUN76"
+  },
+  "paths": {
+    "raw": "_raw",
+    "fleeting": "1.Fleeting_Notes",
+    "literature": "2.Literature_Notes",
+    "permanent": "3.Permanent_Notes",
+    "index": "3.Permanent_Notes/SlipBox/index.md",
+    "meta": "_meta",
+    "reports": "_reports"
+  },
+  "fleeting_types": {
+    "Standard": ""
+  },
+  "gate": {
+    "min_links": 2,
+    "max_overlap": 0.2,
+    "ngram": 8,
+    "pass_avg": 3.5,
+    "cold_start_notes": 5
+  },
+  "growth": {
+    "growing_inbound": 3,
+    "evergreen_inbound": 5
+  },
+  "authoring": "auto",
+  "language": "ko"
+}

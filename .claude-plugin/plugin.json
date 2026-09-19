@@ -1,0 +1,18 @@
+{
+  "name": "zettel",
+  "version": "0.1.0",
+  "description": "개인 제텔카스텐: 원자료·임시노트·문헌노트를 루만 번호가 붙은 영구노트로 승격하는 플러그인. 판단은 LLM이, 게이트와 번호는 스크립트가.",
+  "author": {
+    "name": "Seho Sun",
+    "url": "https://github.com/SHSUN76"
+  },
+  "homepage": "https://github.com/SHSUN76/zettel",
+  "license": "MIT",
+  "keywords": [
+    "zettelkasten",
+    "obsidian",
+    "zettel",
+    "note-taking",
+    "korean"
+  ]
+}
