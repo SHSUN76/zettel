@@ -10,7 +10,7 @@ llmwiki 0.2.1(MIT, 같은 저자)에서 분기한 첫 판이다. 학생용 수�
 
 - `_raw/` 원자료 계층. 아직 읽지 않은 대화 기록·스크랩을 두는 자리이며 `type: raw` 네 줄만 붙는다. `/zettel:literature --from _raw/<파일>` 로 문헌노트가 된다.
 - 세 노트 유형의 **정본 frontmatter**. `mdnote.CANONICAL_KEYS` 가 키 순서를 정하고 `canonical_frontmatter()` 가 그 순서대로 채운다. 허용 밖 키는 값과 함께 돌려주므로 이관 보고서에 적을 수 있다.
-- `mdnote.dump_frontmatter()` 가 정본 형식으로 쓴다 — 날짜는 따옴표 없이, 리스트는 인라인 `[a, b]`, `[[링크]]` 값은 따옴표, `connections` 는 `internal`·`cross` 블록에 인라인 리스트, 빈 값은 키만.
+- `mdnote.dump_frontmatter()` 가 정본 형식으로 쓴다 — 날짜는 따옴표 없이, 리스트는 인라인 `[a, b]`, `[[링크]]` 값은 따옴표, `connections` 는 `internal`·`cross` 블록에 인라인 리스트, 빈 값은 키만. 인라인 리스트는 쉼표 안전하다: 쉼표가 든 항목은 따옴표로 감싸고, 파서는 따옴표 안과 `[[…]]` 안의 쉼표를 구분자로 보지 않는다.
 - `skills/_shared/scripts/normalize.py`. 영구노트 본문을 정본(스타일 A)으로 옮긴다. `detect_style()` 이 A·B·C·other 를 가리고, `normalize_permanent_body()` 가 헤더만 바꾸며, `text_lines()`·`assert_text_preserved()` 가 텍스트 줄이 하나도 없어지지 않았는지 검사한다. `python normalize.py --check <파일들>` 로 서식과 보존 여부만 찍어 볼 수 있다.
 - `2.Literature_Notes/` 아래 `Journals`·`Books`·`Seminars`·`Lectures`·`Datas` 하위 폴더. `literature` 의 `--subtype` 이 저장 위치를 고른다.
 - `init --github-private <이름>` — 요청했을 때만 GitHub 비공개 저장소를 만들고 https 원격으로 push 한다.

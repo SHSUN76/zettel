@@ -34,13 +34,42 @@ _EMPTY_BY_KEY: dict = {
 _CONNECTION_KEYS = ("internal", "cross")
 
 
+def _split_items(inner: str) -> list[str]:
+    """인라인 리스트를 쉼표로 가른다. 따옴표 안과 `[[…]]` 안의 쉼표는 구분자가 아니다.
+    (`- [[도구 선택은 …, 결정 표면은 QE, …]]` 처럼 제목에 쉼표가 든 링크가 쪼개지지 않게 한다)"""
+    out: list[str] = []
+    buf: list[str] = []
+    quote = ""
+    depth = 0
+    i = 0
+    while i < len(inner):
+        ch = inner[i]
+        if quote:
+            buf.append(ch)
+            if ch == quote:
+                quote = ""
+            i += 1; continue
+        if ch in "\"'":
+            quote = ch; buf.append(ch); i += 1; continue
+        if inner.startswith("[[", i):
+            depth += 1; buf.append("[["); i += 2; continue
+        if depth and inner.startswith("]]", i):
+            depth -= 1; buf.append("]]"); i += 2; continue
+        if ch == "," and depth == 0:
+            out.append("".join(buf)); buf = []; i += 1; continue
+        buf.append(ch); i += 1
+    if "".join(buf).strip():
+        out.append("".join(buf))
+    return out
+
+
 def _scalar(v: str):
     v = v.strip()
     if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
         return v[1:-1]
     if v.startswith("[") and v.endswith("]"):
         inner = v[1:-1].strip()
-        return [] if not inner else [_scalar(x) for x in inner.split(",")]
+        return [] if not inner else [_scalar(x) for x in _split_items(inner)]
     if v in ("true", "false"):
         return v == "true"
     return v
@@ -232,8 +261,15 @@ def _scalar_out(v) -> str:
     return _quote(s) if _needs_quote(s) else s
 
 
+def _item_out(v) -> str:
+    """인라인 리스트의 한 항목. 쉼표가 든 값은 반드시 따옴표로 감싼다(항목 구분자와 구별)."""
+    if isinstance(v, str) and "," in v and not _needs_quote(v):
+        return _quote(v)
+    return _scalar_out(v)
+
+
 def _inline_list(items: list) -> str:
-    return "[" + ", ".join(_scalar_out(x) for x in items) + "]"
+    return "[" + ", ".join(_item_out(x) for x in items) + "]"
 
 
 def dump_frontmatter(fm: dict) -> str:

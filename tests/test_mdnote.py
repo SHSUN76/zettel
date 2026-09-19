@@ -87,3 +87,9 @@ def test_dump_formats_dates_lists_links_and_empty_values():
     assert "connections:\n  internal: [\"[[외부 기억은 대화 상대다]]\"]\n  cross: []" in text
     assert "\nplatform:\n" in text                          # 빈 값은 키만
     assert parse_frontmatter(text + "본문")[0] == out        # 왕복해도 같다
+
+def test_dump_roundtrips_link_titles_containing_commas():
+    title = "[[도구 선택은 물리에 따른다 — 분자는 ORCA, 결정 표면은 QE, 빠른 탐색은 MLIP]]"
+    out, _ = canonical_frontmatter("permanent", {"connections": {"internal": [title], "cross": []}})
+    back, _ = parse_frontmatter(dump_frontmatter(out) + "본문")
+    assert back["connections"]["internal"] == [title]        # 제목 속 쉼표가 항목을 가르지 않는다
