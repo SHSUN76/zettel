@@ -9,11 +9,15 @@
 | 상세 설명 · 예시/사례 | `### 원문 (출처)` 뒤 `**상세 설명**`·`**예시/사례**` 소제목 |
 | 출처/참고 | `### 원문 (출처)` |
 | 추가 질문 · 개인적 질문 · 나의 생각과 질문 · 질문 | `### 생각 (질문)` |
-| 연결된 아이디어 · 관련 노트 | `### 연결 (이유)` |
-| (없음) | `### 추천 (주제)` 빈 절 |
+| 연결된 아이디어 · 관련 노트 | `### 연결 (이유)` (마지막 절) |
+| (없음) | `### 추천 (주제)` 는 만들지 않음. `### 연결 (이유)` 가 없으면 빈 절로 추가 |
 
 표에 없는 헤더는 `### 생각 (질문)` 아래 `**원헤더**` 소제목으로 보존한다.
 `### 날짜`·`### 태그` 줄은 frontmatter(meta)에서 다시 만든다.
+
+절 순서 정본은 **날짜 → 태그 → 메모 → 원문 (출처) → 생각 (질문) → [추천 (주제)] → 연결 (이유)** 이며
+`추천 (주제)` 는 선택 절이다. 이미 스타일 A 인 노트는 **절 순서를 재배열하지 않는다** — 날짜·태그 줄을
+meta 값으로 보정하고 빠진 `연결 (이유)` 빈 절을 끝에 붙이는 것이 전부다.
 """
 from __future__ import annotations
 import argparse, json, re, sys
@@ -27,13 +31,15 @@ _MEMO_CALLOUT = re.compile(r"^>\s*\[!\s*메모\s*\]")
 _BOLD_ONLY = re.compile(r"^\*\*[^*]+\*\*$")
 _RULE = "---"
 
-SLOT_ORDER = ("memo", "source", "thought", "link", "recommend")
+SLOT_ORDER = ("memo", "source", "thought", "recommend", "link")
 SLOT_HEADERS = {
     "source": "### 원문 (출처)",
     "thought": "### 생각 (질문)",
-    "link": "### 연결 (이유)",
     "recommend": "### 추천 (주제)",
+    "link": "### 연결 (이유)",
 }
+# `### 연결 (이유)` 가 없는 노트에 붙이는 빈 절. 사용자 템플릿과 같은 두 줄이다.
+CONNECTION_PLACEHOLDER = ("- 🔗 내부 연결:", "- ⚡ 횡단 연결:")
 
 # 원 헤더 → (정본 슬롯, 소제목). 소제목이 None 이면 절 본문에 바로 붙인다.
 _HEADER_MAP: dict[str, tuple[str, str | None]] = {
@@ -169,6 +175,10 @@ def _split_blocks(lines: list[str]) -> list[tuple[str | None, int, list[str]]]:
     return [b for b in blocks if b[0] is not None or any(x.strip() for x in b[2])]
 
 
+def _date_line(meta: dict) -> str:
+    return f"### 날짜 : {str(meta.get('date') or '').strip()}".rstrip()
+
+
 def _tag_line(meta: dict) -> str:
     tags = meta.get("tags") or []
     if isinstance(tags, str):
@@ -177,10 +187,66 @@ def _tag_line(meta: dict) -> str:
     return f"### 태그 : {marked}".rstrip()
 
 
+def _has_value(meta: dict, key: str) -> bool:
+    v = meta.get(key)
+    return bool(v) if not isinstance(v, str) else bool(v.strip())
+
+
+def _find_head(lines: list[str], match) -> int | None:
+    """조건에 맞는 헤더 줄의 위치. match 는 (키, 원문) 을 받아 bool 을 낸다."""
+    for i, raw in enumerate(lines):
+        m = _HEADER.match(raw.rstrip())
+        if m and m.group(2) and match(_head_key(m.group(2)), m.group(2).strip()):
+            return i
+    return None
+
+
+def _find_link_section(lines: list[str]) -> int | None:
+    return _find_head(lines, lambda key, raw: (_HEADER_MAP.get(key) or (None, None))[0] == "link")
+
+
+def _lstrip_blank(lines: list[str]) -> list[str]:
+    out = list(lines)
+    while out and not out[0].strip():
+        out.pop(0)
+    return out
+
+
 def normalize_permanent_body(body: str, meta: dict | None = None) -> str:
-    """영구노트 본문을 정본(스타일 A)으로 바꾼다. 헤더만 바꾸고 텍스트 줄은 버리지 않는다."""
+    """영구노트 본문을 정본(스타일 A)으로 바꾼다. 헤더만 바꾸고 텍스트 줄은 버리지 않는다.
+
+    이미 스타일 A 인 본문은 절 순서를 건드리지 않고 날짜·태그 줄 보정과
+    빠진 `### 연결 (이유)` 빈 절 추가만 한다.
+    """
     meta = meta or {}
     lines = body.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    if detect_style(body) == "A":
+        return _touch_style_a(lines, meta)
+    return _convert_to_style_a(lines, meta)
+
+
+def _touch_style_a(lines: list[str], meta: dict) -> str:
+    """스타일 A 본문: 절을 재배열하지 않는다. 날짜·태그 줄 보정 + 연결 절 보강뿐."""
+    out = list(lines)
+    i_date = _find_head(out, lambda key, raw: key == "날짜")
+    i_tag = _find_head(out, lambda key, raw: key == "태그")
+    if i_date is not None:
+        if _has_value(meta, "date"):           # meta 에 값이 없으면 기존 줄을 지우지 않는다
+            out[i_date] = _date_line(meta)
+    if i_tag is not None:
+        if _has_value(meta, "tags"):
+            out[i_tag] = _tag_line(meta)
+    if i_tag is None:
+        out = [_tag_line(meta), ""] + _lstrip_blank(out)
+    if i_date is None:
+        out = [_date_line(meta), ""] + _lstrip_blank(out)
+    if _find_link_section(out) is None:
+        out = _trim(out) + ["", SLOT_HEADERS["link"], *CONNECTION_PLACEHOLDER]
+    return "\n".join(_trim(out)) + "\n"
+
+
+def _convert_to_style_a(lines: list[str], meta: dict) -> str:
+    """스타일 B·C·기타 본문을 정본 절 순서로 옮긴다. `추천 (주제)` 는 내용이 있을 때만 쓴다."""
     lines, footer = _split_footer(lines)
     buckets: dict[str, list[tuple[str | None, list[str]]]] = {s: [] for s in SLOT_ORDER}
 
@@ -204,12 +270,20 @@ def normalize_permanent_body(body: str, meta: dict | None = None) -> str:
         else:
             buckets["thought"].append((f"**{_norm_space(head)}**", content))
 
-    out: list[str] = [f"### 날짜 : {meta.get('date', '')}".rstrip(), "", _tag_line(meta), ""]
+    out: list[str] = [_date_line(meta), "", _tag_line(meta), ""]
     out += _render_memo(buckets["memo"])
-    for slot in ("source", "thought", "link", "recommend"):
+    for slot in ("source", "thought"):
         out.append("")
         out.append(SLOT_HEADERS[slot])
         out += _render_section(buckets[slot])
+    recommend = _render_section(buckets["recommend"])
+    if recommend:                              # 선택 절: 원절이 없으면 만들지 않는다
+        out.append("")
+        out.append(SLOT_HEADERS["recommend"])
+        out += recommend
+    out.append("")                             # 연결 (이유) 는 필수이며 마지막 절이다
+    out.append(SLOT_HEADERS["link"])
+    out += _render_section(buckets["link"]) or list(CONNECTION_PLACEHOLDER)
     if footer:
         out.append("")
         out += _trim(footer)
@@ -249,7 +323,11 @@ def _render_section(entries: list[tuple[str | None, list[str]]]) -> list[str]:
 # ---------------------------------------------------------------- 보존 검사
 
 def text_lines(md: str) -> set:
-    """헤더·빈 줄·콜아웃 접두 `> `·소제목 굵은 글씨 마커를 제외한 텍스트 줄 집합."""
+    """헤더·빈 줄·콜아웃 접두 `> `·소제목 굵은 글씨 마커·빈 절 자리표시를 제외한 텍스트 줄 집합.
+
+    자리표시(`- 🔗 내부 연결:` · `- ⚡ 횡단 연결:` 와 내용 없는 `-`)는 구조이지 글이 아니므로
+    양쪽에서 함께 빠진다. 그래서 빠진 `연결 (이유)` 빈 절을 채워 넣어도 보존 검사를 통과한다.
+    """
     out: set = set()
     for raw in md.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         s = raw.strip()
@@ -262,6 +340,8 @@ def text_lines(md: str) -> set:
         if s.startswith("[!"):
             continue
         if _BOLD_ONLY.match(s):
+            continue
+        if s in CONNECTION_PLACEHOLDER or s in ("-", "*", "•"):
             continue
         out.add(s)
     return out
